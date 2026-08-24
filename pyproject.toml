@@ -1,0 +1,20 @@
+[project]
+name = "inference-gateway"
+version = "0.1.0"
+description = "A provider-agnostic OpenAI-shape gateway with tiered routing, confidence escalation, semantic and exact caching, and a cost-per-1k-tokens ledger."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
