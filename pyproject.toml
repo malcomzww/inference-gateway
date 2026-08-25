@@ -3,14 +3,26 @@ name = "inference-gateway"
 version = "0.1.0"
 description = "A provider-agnostic OpenAI-shape gateway with tiered routing, confidence escalation, semantic and exact caching, and a cost-per-1k-tokens ledger."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "llm-client-kit",
+    "uvicorn>=0.30",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+# The shared library is a sibling checkout, not a published package. A path
+# source keeps the two repos developing together without a release cycle
+# between them; CI checks out the workspace so the relative path resolves.
+[tool.uv.sources]
+llm-client-kit = { path = "../llm-client-kit", editable = true }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
@@ -18,3 +30,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+# B008 flags function calls in argument defaults, which is exactly how FastAPI
+# declares dependency injection. Exempting the two DI markers by name keeps the
+# rule active for every other call -- a blanket per-file ignore would switch the
+# check off across the app module, where it is still worth having.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]
