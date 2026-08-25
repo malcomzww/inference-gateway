@@ -11,3 +11,7 @@ build/
 .env.*
 !.env.example
 .DS_Store
+
+# Machine-specific: per-pair scores and wall-clock latency. The committed
+# results files carry only the claims that hold on any machine.
+results/cache-raw.md
