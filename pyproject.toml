@@ -31,7 +31,7 @@ packages = ["src/inference_gateway"]
 llm-client-kit = { path = "../llm-client-kit", editable = true }
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "../llm-client-kit/src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
