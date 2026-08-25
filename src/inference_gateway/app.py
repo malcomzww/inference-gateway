@@ -232,8 +232,12 @@ def create_app(state: GatewayState | None = None) -> FastAPI:
         # tenant cannot read another's reply by guessing a key.
         idem_scope = f"{tenant}:{idempotency_key}" if idempotency_key else None
         if idem_scope and idem_scope in st.idempotency:
+            # Deep-copy the `gateway` block before marking it. A shallow
+            # dict() copy shares that nested dict with the stored response, so
+            # writing the marker in place would both mislabel this reply and
+            # corrupt the stored one for every later replay.
             cached = dict(st.idempotency[idem_scope])
-            cached["served_by"] = "idempotency"
+            cached["gateway"] = {**cached["gateway"], "served_by": "idempotency"}
             return cached
 
         if body.stream:
