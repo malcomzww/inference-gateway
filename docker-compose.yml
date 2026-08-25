@@ -1,0 +1,74 @@
+# Ports are pinned to unusual high numbers rather than the defaults (5432,
+# 6379, 8000) because several repos in this portfolio run at once on one
+# machine, and colliding on a default port produces a confusing failure in
+# whichever stack started second.
+#
+# Postgres and Redis are declared here because the gateway is designed to use
+# them, but note honestly: the current implementation keeps the cache, ledger
+# and idempotency store **in process memory**. These services are the seam for
+# the multi-worker version, not a dependency of the tests -- `pytest` needs
+# nothing running. That limitation is stated in the README rather than implied
+# away by a compose file that suggests more than the code does.
+
+name: inference-gateway
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+      POSTGRES_DB: gateway
+    ports:
+      - "55446:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Without a healthcheck the gateway starts before Postgres accepts
+      # connections and fails its first request rather than waiting.
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Cache entries are reconstructible from upstream, so persistence buys
+    # nothing here and costs fsync latency on every write.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "56393:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    build:
+      # Context is the parent workspace, not this repo: llm-client-kit is a
+      # sibling path dependency and Docker cannot COPY above its context.
+      context: ..
+      dockerfile: inference-gateway/Dockerfile
+    ports:
+      - "58014:8000"
+    environment:
+      DATABASE_URL: postgresql://gateway:gateway@postgres:5432/gateway
+      REDIS_URL: redis://redis:6379/0
+      # No API key: the gateway runs against its stub upstream. Pointing it at
+      # a real provider is a matter of setting OPENAI_BASE_URL and
+      # OPENAI_API_KEY, which llm-client-kit's ClientConfig already reads.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;
+             urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

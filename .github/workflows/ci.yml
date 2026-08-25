@@ -11,6 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: inference-gateway
+
+      # llm-client-kit is a sibling path dependency, not a published package,
+      # so it must exist next to this checkout for uv to resolve it. Checking
+      # it out here keeps the two repos developing together without a release
+      # cycle between them.
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/llm-client-kit
+          path: llm-client-kit
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -21,21 +32,25 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
+        working-directory: inference-gateway
         run: uv sync --extra dev
 
       - name: Lint
-        run: uv run ruff check src tests
+        working-directory: inference-gateway
+        run: uv run ruff check src tests scripts
 
       - name: Test
+        working-directory: inference-gateway
         run: uv run pytest -q
 
       # The portfolio's signature check: every number in the README is
       # generated, so a hand-edited result fails the build rather than
-      # silently drifting from the code that produced it.
+      # silently drifting from the code that produced it. The script also
+      # asserts each of its own claims, so this step fails either on a stale
+      # file or on a broken claim.
       - name: Verify generated results are current
+        working-directory: inference-gateway
         run: |
-          if [ -f scripts/generate_results.py ]; then
-            uv run python scripts/generate_results.py
-            git diff --exit-code results/ \
-              || (echo "results/ is stale -- regenerate and commit" && exit 1)
-          fi
+          uv run python scripts/generate_results.py
+          git diff --exit-code results/ \
+            || (echo "results/ is stale -- regenerate and commit" && exit 1)
